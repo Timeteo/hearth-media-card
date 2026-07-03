@@ -168,6 +168,19 @@ class HearthMediaCard extends HTMLElement {
         <div class="prog"><div class="fill"></div></div>
       </div>
     `;
+    // MA's image proxy can 404 briefly during track changes; retry failed loads
+    const tile = this.shadowRoot.querySelector(".tile");
+    if (tile) {
+      let tries = 0;
+      tile.addEventListener("error", () => {
+        if (tries++ < 3) setTimeout(() => {
+          const bust = art + (art.includes("?") ? "&" : "?") + "r=" + Date.now();
+          tile.src = bust;
+          const bg = this.shadowRoot.querySelector(".bgart");
+          if (bg) bg.style.backgroundImage = `url('${bust}')`;
+        }, 2000 * tries);
+      });
+    }
     this.shadowRoot.getElementById("prev").addEventListener("click", () => this._call("media_previous_track"));
     this.shadowRoot.getElementById("pp").addEventListener("click", () => this._call("media_play_pause"));
     this.shadowRoot.getElementById("next").addEventListener("click", () => this._call("media_next_track"));
