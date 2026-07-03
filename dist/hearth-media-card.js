@@ -101,7 +101,7 @@ class HearthMediaCard extends HTMLElement {
     this.style.display = "block";
 
     const a = st.attributes;
-    const art = a.entity_picture || "";
+    const art = a.entity_picture_local || a.entity_picture || "";
     const title = a.media_title || a.media_content_id || "Playing";
     const artist = [a.media_artist || a.media_series_title, a.media_album_name]
       .filter(Boolean).join(" — ");
