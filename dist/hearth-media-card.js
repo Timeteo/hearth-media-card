@@ -19,7 +19,7 @@ class HearthMediaCard extends HTMLElement {
     this._config = {
       entities: null,      // optional priority-ordered list; default: any media_player
       exclude: [],         // entity_ids to never show
-      height: 230,
+      height: 190,
       accent: "#FFB27A",
       margin: "0",         // e.g. "0 -64px -40px" to escape view padding and bleed to edges
       ...config,
@@ -115,6 +115,7 @@ class HearthMediaCard extends HTMLElement {
     if (key === this._lastKey) { this._updateProgress(); return; }
     this._lastKey = key;
 
+    const tile = Math.min(174, h - 40);
     const pct = this._progressPct(st);
     const playPath = paused ? "M8 5v14l11-7z" : "M8 5h3v14H8zm5 0h3v14h-3z";
 
@@ -130,13 +131,13 @@ class HearthMediaCard extends HTMLElement {
         .scrim { position:absolute; inset:0; background:
           linear-gradient(90deg, rgba(10,11,14,0.96) 0%, rgba(10,11,14,0.72) 45%, rgba(10,11,14,0.25) 100%),
           linear-gradient(180deg, rgba(10,11,14,1) 0%, rgba(10,11,14,0) 40%); }
-        .meta { position:absolute; left:64px; bottom:34px; right:${64 + 174 + 40 + 240}px; }
+        .meta { position:absolute; left:64px; bottom:26px; right:${64 + tile + 40 + 240}px; }
         .src { font-size:14px; font-weight:600; letter-spacing:2.5px; color:${accent};
-          text-transform:uppercase; margin-bottom:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .title { font-size:40px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .artist { font-size:23px; color:rgba(255,255,255,0.6); margin-top:6px;
+          text-transform:uppercase; margin-bottom:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .title { font-size:36px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .artist { font-size:22px; color:rgba(255,255,255,0.6); margin-top:2px;
           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .controls { position:absolute; right:${64 + 174 + 40}px; bottom:${Math.round(h / 2) - 34}px;
+        .controls { position:absolute; right:${64 + tile + 40}px; bottom:${Math.round(h / 2) - 34}px;
           display:flex; align-items:center; gap:14px; }
         .btn { width:68px; height:68px; border-radius:50%; display:flex; align-items:center;
           justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
@@ -144,7 +145,7 @@ class HearthMediaCard extends HTMLElement {
           filter:drop-shadow(0 2px 8px rgba(0,0,0,0.8)); }
         .btn.play { background:rgba(10,11,14,0.5); border:1.5px solid ${accent}B3; }
         .btn.play svg { fill:${accent}; width:32px; height:32px; }
-        .tile { position:absolute; right:64px; bottom:${Math.round((h - 174) / 2)}px; width:174px; height:174px;
+        .tile { position:absolute; right:64px; bottom:${Math.round((h - tile) / 2)}px; width:${tile}px; height:${tile}px;
           border-radius:18px; object-fit:cover; box-shadow:0 12px 40px rgba(0,0,0,0.7);
           border:1px solid rgba(255,255,255,0.14); background:#10121a; }
         .prog { position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(255,255,255,0.12); }
