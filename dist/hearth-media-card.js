@@ -170,13 +170,13 @@ class HearthMediaCard extends HTMLElement {
       </div>
     `;
     // MA's image proxy can 404 briefly during track changes; retry failed loads
-    const tile = this.shadowRoot.querySelector(".tile");
-    if (tile) {
+    const tileEl = this.shadowRoot.querySelector(".tile");
+    if (tileEl) {
       let tries = 0;
-      tile.addEventListener("error", () => {
+      tileEl.addEventListener("error", () => {
         if (tries++ < 3) setTimeout(() => {
           const bust = art + (art.includes("?") ? "&" : "?") + "r=" + Date.now();
-          tile.src = bust;
+          tileEl.src = bust;
           const bg = this.shadowRoot.querySelector(".bgart");
           if (bg) bg.style.backgroundImage = `url('${bust}')`;
         }, 2000 * tries);
