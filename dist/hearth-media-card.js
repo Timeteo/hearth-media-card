@@ -21,6 +21,7 @@ class HearthMediaCard extends HTMLElement {
       exclude: [],         // entity_ids to never show
       height: 190,
       accent: "#FFB27A",
+      paused_grace_minutes: 10,  // hide paused players after this long; 0 = hide immediately
       margin: "0",         // e.g. "0 -64px -40px" to escape view padding and bleed to edges
       ...config,
     };
@@ -56,7 +57,10 @@ class HearthMediaCard extends HTMLElement {
       const st = this._hass.states[id];
       if (!st || this._config.exclude.includes(id)) continue;
       if (st.state === "playing") return st;
-      if (st.state === "paused" && !paused) paused = st;
+      if (st.state === "paused" && !paused) {
+        const age = (Date.now() - new Date(st.last_changed).getTime()) / 60000;
+        if (age < this._config.paused_grace_minutes) paused = st;
+      }
     }
     return paused;
   }
