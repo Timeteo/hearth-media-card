@@ -93,6 +93,47 @@ class HearthMediaCard extends HTMLElement {
     return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
+  // Artwork sources, best first: the active player's HA proxy, its direct URL,
+  // then any other listed player showing the same track (an Apple TV mirroring the
+  // same song usually has working art when Music Assistant's imageproxy 404s).
+  _artCandidates(st) {
+    const a = st.attributes;
+    const out = [a.entity_picture_local, a.entity_picture].filter(Boolean);
+    const title = a.media_title;
+    if (title && this._hass) {
+      // scan every player, not just the priority list: the list decides who owns
+      // the sheet, but any player mirroring the track is a valid art source
+      const others = Object.keys(this._hass.states).filter((e) => e.startsWith("media_player."));
+      for (const id of others) {
+        // `exclude` only bars a player from owning the sheet; its artwork is still fair game
+        if (id === st.entity_id) continue;
+        const o = this._hass.states[id];
+        if (!o || o.state !== "playing") continue;
+        const b = o.attributes;
+        const sameTrack = b.media_title === title
+          || (a.media_artist && b.media_artist === a.media_artist
+              && a.media_album_name && b.media_album_name === a.media_album_name);
+        if (!sameTrack) continue;
+        for (const u of [b.entity_picture_local, b.entity_picture]) {
+          if (u && !out.includes(u)) out.push(u);
+        }
+      }
+    }
+    // Apple's art often arrives as HEIC, which the Portal WebView can't decode.
+    // HA's proxy URL carries the original mzstatic template in ?cache=; expand it
+    // to a plain JPEG and try that first among the fallbacks.
+    const jpg = [];
+    for (const u of out) {
+      const m = /[?&]cache=(https?%3A%2F%2F|https?:\/\/)[^&]*/i.exec(u);
+      if (!m) continue;
+      let tpl = decodeURIComponent(u.slice(m.index + m[0].indexOf("=") + 1));
+      if (!/mzstatic\.com/.test(tpl) || !tpl.includes("{w}")) continue;
+      tpl = tpl.replace("{w}x{h}{c}.{f}", "512x512bb.jpg");
+      if (!out.includes(tpl) && !jpg.includes(tpl)) jpg.push(tpl);
+    }
+    return out.concat(jpg);
+  }
+
   _render() {
     if (!this._hass || !this._config) return;
     const st = this._active();
@@ -105,7 +146,8 @@ class HearthMediaCard extends HTMLElement {
     this.style.display = "block";
 
     const a = st.attributes;
-    const art = a.entity_picture_local || a.entity_picture || "";
+    const artSources = this._artCandidates(st);
+    const art = artSources[0] || "";
     const title = a.media_title || a.media_content_id || "Playing";
     const artist = [a.media_artist || a.media_series_title, a.media_album_name]
       .filter(Boolean).join(" — ");
@@ -173,17 +215,56 @@ class HearthMediaCard extends HTMLElement {
         <div class="prog"><div class="fill"></div></div>
       </div>
     `;
-    // MA's image proxy can 404 briefly during track changes; retry failed loads
+    // MA's imageproxy 404s (briefly during track changes, and persistently for
+    // AirPlay-sourced tracks it never cached). Retry once, then fall through to the
+    // next source; if every source fails, drop the artwork instead of showing a
+    // broken image. The band keeps its fixed height either way.
     const tileEl = this.shadowRoot.querySelector(".tile");
     if (tileEl) {
-      let tries = 0;
+      const bgEl = this.shadowRoot.querySelector(".bgart");
+      let idx = 0, retried = false, rechecked = false;
+      // a source the Portal VLAN can't route (anything off-LAN) never errors, it
+      // just hangs — treat a stalled load as a failure so we move on / clean up
+      let stall = null;
+      const armStall = () => {
+        clearTimeout(stall);
+        stall = setTimeout(() => {
+          if (!tileEl.complete || !tileEl.naturalWidth) {
+            tileEl.dispatchEvent(new Event("error"));
+          }
+        }, 6000);
+      };
+      const apply = (url) => {
+        tileEl.src = url;
+        if (bgEl) bgEl.style.backgroundImage = `url('${url}')`;
+        armStall();
+      };
+      tileEl.addEventListener("load", () => clearTimeout(stall));
+      armStall();
       tileEl.addEventListener("error", () => {
-        if (tries++ < 3) setTimeout(() => {
-          const bust = art + (art.includes("?") ? "&" : "?") + "r=" + Date.now();
-          tileEl.src = bust;
-          const bg = this.shadowRoot.querySelector(".bgart");
-          if (bg) bg.style.backgroundImage = `url('${bust}')`;
-        }, 2000 * tries);
+        const src = artSources[idx];
+        if (src && !retried) {
+          retried = true;
+          setTimeout(() => apply(src + (src.includes("?") ? "&" : "?") + "r=" + Date.now()), 1500);
+          return;
+        }
+        retried = false;
+        idx += 1;
+        if (idx < artSources.length) { apply(artSources[idx]); return; }
+        // other players can publish the track a few seconds late — look again once
+        if (!rechecked) {
+          rechecked = true;
+          const cur = this._active();
+          const fresh = cur ? this._artCandidates(cur).filter((u) => !artSources.includes(u)) : [];
+          if (fresh.length) {
+            artSources.push(...fresh);
+            apply(artSources[idx]);
+            return;
+          }
+        }
+        clearTimeout(stall);
+        tileEl.remove();
+        if (bgEl) bgEl.style.backgroundImage = "";
       });
     }
     this.shadowRoot.getElementById("prev").addEventListener("click", () => this._call("media_previous_track"));
